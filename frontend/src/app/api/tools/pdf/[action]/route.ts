@@ -1,0 +1,109 @@
+import type { NextRequest } from "next/server";
+import { apiError, backendConfig, getJson, notConfigured, proxyUpload, upstreamError } from "@/lib/backend";
+
+/**
+ * PDF toolkit. The workspace uploads each PDF once (`upload` → a token), then every estimate
+ * and action sends tokens instead of the file. Merge/split/compress/organize still accept files too.
+ * Bodies are streamed to FastAPI untouched; the backend validates fields and files.
+ */
+
+const MAX_MB = 150; // Matches MAX_DOWNLOAD_SIZE_MB in backend/app/core/config.py.
+const SMALL_MB = 1; // Token-only requests are a few bytes of form data.
+const THUMB_CACHE_SECONDS = 30 * 60; // Matches PDF_CACHE_TTL_SECONDS: a token's pages never change.
+
+const ACTIONS = {
+  upload: { path: "pdf/upload", maxMB: MAX_MB, failed: "We couldn't read that PDF." },
+  merge: { path: "pdf/merge", maxMB: MAX_MB, failed: "We couldn't merge those PDFs." },
+  split: { path: "pdf/split", maxMB: MAX_MB, failed: "We couldn't split that PDF." },
+  compress: { path: "pdf/compress", maxMB: MAX_MB, failed: "We couldn't compress that PDF." },
+  organize: { path: "pdf/organize", maxMB: MAX_MB, failed: "We couldn't rearrange that PDF." },
+  "merge-estimate": { path: "pdf/merge/estimate", maxMB: SMALL_MB, failed: "We couldn't work out the merged size." },
+  "split-estimate": { path: "pdf/split/estimate", maxMB: SMALL_MB, failed: "We couldn't work out the split." },
+  "compress-estimate": { path: "pdf/compress/estimate", maxMB: SMALL_MB, failed: "We couldn't work out the compressed size." },
+  "organize-estimate": { path: "pdf/organize/estimate", maxMB: SMALL_MB, failed: "We couldn't work out the new size." },
+  // PDF tools (backend/app/api/v1/endpoints/pdf_tools.py)
+  "page-numbers": { path: "pdf/page-numbers", maxMB: MAX_MB, failed: "We couldn't number the pages." },
+  watermark: { path: "pdf/watermark", maxMB: MAX_MB, failed: "We couldn't add the watermark." },
+  crop: { path: "pdf/crop", maxMB: MAX_MB, failed: "We couldn't crop that PDF." },
+  edit: { path: "pdf/edit", maxMB: MAX_MB, failed: "We couldn't save your changes." },
+  "redact-find": { path: "pdf/redact/find", maxMB: SMALL_MB, failed: "We couldn't search that PDF." },
+  redact: { path: "pdf/redact", maxMB: MAX_MB, failed: "We couldn't redact that PDF." },
+  protect: { path: "pdf/protect", maxMB: MAX_MB, failed: "We couldn't protect that PDF." },
+  unlock: { path: "pdf/unlock", maxMB: MAX_MB, failed: "We couldn't unlock that PDF." },
+  repair: { path: "pdf/repair", maxMB: MAX_MB, failed: "We couldn't repair that PDF." },
+  ocr: { path: "pdf/ocr", maxMB: MAX_MB, failed: "We couldn't read the text in that PDF." },
+  "from-images": { path: "pdf/from-images", maxMB: MAX_MB, failed: "We couldn't make a PDF from those images." },
+  pdfa: { path: "pdf/pdfa", maxMB: MAX_MB, failed: "We couldn't convert that PDF to PDF/A." },
+  compare: { path: "pdf/compare", maxMB: SMALL_MB, failed: "We couldn't compare those PDFs." },
+  "compare-report": { path: "pdf/compare/report", maxMB: SMALL_MB, failed: "We couldn't make the comparison PDF." },
+} as const;
+
+/** Long jobs (OCR of a long scan, big conversions) get more time than the 5-minute default. */
+const LONG: Partial<Record<Action, number>> = { ocr: 15 * 60_000, pdfa: 10 * 60_000, compare: 10 * 60_000, "compare-report": 10 * 60_000 };
+
+type Action = keyof typeof ACTIONS;
+const isAction = (v: string): v is Action => Object.hasOwn(ACTIONS, v);
+
+export async function POST(req: NextRequest, ctx: RouteContext<"/api/tools/pdf/[action]">) {
+  const { action } = await ctx.params;
+  if (!isAction(action)) return apiError(404, "Unknown PDF tool.");
+  const cfg = ACTIONS[action];
+
+  return proxyUpload(req, cfg.path, {
+    maxMB: cfg.maxMB,
+    timeoutMs: LONG[action] ?? 5 * 60_000,
+    messages: {
+      badBody: "Send the PDF as form data.",
+      tooBig:
+        action === "merge"
+          ? `Those PDFs add up to more than ${MAX_MB} MB. Merge them in smaller batches.`
+          : action === "from-images" || action === "edit"
+            ? `Those files add up to more than ${MAX_MB} MB. Try fewer or smaller images.`
+            : `That PDF is over ${MAX_MB} MB.`,
+      timeout: "That took too long. Try a smaller PDF.",
+      unreachable: "Couldn't reach the PDF service. Is the backend running?",
+      failed: cfg.failed,
+    },
+  });
+}
+
+/**
+ * GET /api/tools/pdf/thumbnail?token=…&page=…&width=… → one page of an uploaded PDF as PNG.
+ * GET /api/tools/pdf/ocr-languages → the languages text recognition can read.
+ */
+export async function GET(req: NextRequest, ctx: RouteContext<"/api/tools/pdf/[action]">) {
+  const { action } = await ctx.params;
+  if (action === "ocr-languages") return getJson("pdf/ocr/languages", "We couldn't list the OCR languages.");
+  if (action !== "thumbnail") return apiError(404, "Unknown PDF tool.");
+  const backend = backendConfig();
+  if (!backend) return notConfigured();
+
+  const q = req.nextUrl.searchParams;
+  const token = q.get("token") ?? "";
+  const page = q.get("page") ?? "";
+  const width = q.get("width") ?? "160";
+  if (!/^[a-f0-9]{32}$/.test(token) || !/^\d{1,5}$/.test(page) || !/^\d{1,4}$/.test(width)) {
+    return apiError(400, "Ask for a page like ?token=…&page=1.");
+  }
+
+  let upstream: Response;
+  try {
+    upstream = await fetch(backend.endpoint(`pdf/thumbnail?${new URLSearchParams({ token, page, width })}`), {
+      headers: { Authorization: `Bearer ${backend.token}` },
+      cache: "no-store",
+      signal: AbortSignal.any([req.signal, AbortSignal.timeout(60_000)]),
+    });
+  } catch (e) {
+    if (e instanceof DOMException && e.name === "TimeoutError") return apiError(504, "That page took too long to draw.");
+    return apiError(502, "Couldn't reach the PDF service. Is the backend running?");
+  }
+  if (!upstream.ok) return upstreamError(upstream, "We couldn't draw that page.");
+
+  return new Response(upstream.body, {
+    status: 200,
+    headers: {
+      "Content-Type": "image/png",
+      "Cache-Control": `private, max-age=${THUMB_CACHE_SECONDS}, immutable`,
+    },
+  });
+}

@@ -1,0 +1,77 @@
+import type { Metadata } from "next";
+
+/** The public origin. Used for canonical URLs, the sitemap, robots.txt and structured data. */
+export const SITE_URL = "https://do-whatever-you-like.colddsam.com";
+export const SITE_NAME = "Do-Whatever-You-Like";
+
+/** Who runs the site, shown on /about and in the Organization schema. */
+export const OPERATOR = { name: "colddsam", url: "https://github.com/colddsam" } as const;
+/** Questions, bug reports and takedown requests. */
+export const CONTACT_EMAIL = "contact@colddsam.com";
+
+/** Search results cut titles off at about 60 characters. */
+export const TITLE_MAX = 60;
+const BRAND_SUFFIX = /\s+[—|-]\s+Do-Whatever-You-Like$/;
+
+/**
+ * Keeps " — Do-Whatever-You-Like" only while the whole title fits in a result. Past that the brand
+ * goes: search engines show the site name beside the result anyway (from the WebSite schema).
+ */
+export function fitTitle(title: string) {
+  return title.length > TITLE_MAX ? title.replace(BRAND_SUFFIX, "") : title;
+}
+
+const DEFAULT_IMAGE ={ url: "/opengraph-image", width: 1200, height: 630, alt: "Do-Whatever-You-Like: free online tools" };
+
+/**
+ * A page's title, description, canonical and social cards in one place. Next replaces (not merges)
+ * a parent's `openGraph`/`twitter`, so every page builds the full set here.
+ */
+export function pageMeta({
+  title,
+  description,
+  path,
+  image,
+  type = "website",
+  publishedTime,
+  modifiedTime,
+  tags,
+}: {
+  title: string;
+  description: string;
+  path: string;
+  image?: string;
+  type?: "website" | "article";
+  publishedTime?: string;
+  modifiedTime?: string;
+  tags?: string[];
+}): Metadata {
+  title = fitTitle(title);
+  const card = image ? { ...DEFAULT_IMAGE, url: image, alt: title } : DEFAULT_IMAGE;
+  return {
+    title,
+    description,
+    alternates: { canonical: path },
+    // The site's card unless the page has its own (a route's opengraph-image file also wins for og:image).
+    openGraph:
+      type === "article"
+        ? {
+            type: "article",
+            siteName: SITE_NAME,
+            locale: "en_US",
+            url: path,
+            title,
+            description,
+            images: [card],
+            publishedTime,
+            modifiedTime: modifiedTime ?? publishedTime,
+            authors: [OPERATOR.name],
+            tags,
+          }
+        : { type: "website", siteName: SITE_NAME, locale: "en_US", url: path, title, description, images: [card] },
+    twitter: { card: "summary_large_image", title, description, images: [card] },
+  };
+}
+
+/** Absolute URL for a site path, for structured data (which can't use `metadataBase`). */
+export const absUrl = (path: string) => (path === "/" ? SITE_URL : `${SITE_URL}${path}`);

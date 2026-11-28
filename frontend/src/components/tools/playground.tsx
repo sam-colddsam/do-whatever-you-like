@@ -1,0 +1,249 @@
+"use client";
+
+import type { ComponentType } from "react";
+import { getTool, type ToolKind } from "@/lib/tools";
+import dynamic from "next/dynamic";
+import { getUtility } from "@/lib/utilities/catalog";
+import { useStartParam } from "@/lib/start-params";
+
+/**
+ * Each workspace is its own chunk, so a tool page downloads only the code for its tool (the PDF,
+ * image and converter workspaces pull in heavy libraries). Pages are still rendered on the server;
+ * `loading` only shows during client-side navigation, at the workbench's usual height.
+ */
+const loading = () => <div aria-hidden className="h-80 animate-pulse rounded-lg border border-line bg-surface" />;
+const DownloaderPlayground = dynamic(() => import("./downloader-playground").then((m) => m.DownloaderPlayground), { loading });
+const PdfPlayground = dynamic(() => import("./pdf-playground").then((m) => m.PdfPlayground), { loading });
+const CompareTool = dynamic(() => import("./pdf/compare-tool").then((m) => m.CompareTool), { loading });
+const CropTool = dynamic(() => import("./pdf/crop-tool").then((m) => m.CropTool), { loading });
+const EditTool = dynamic(() => import("./pdf/edit-tool").then((m) => m.EditTool), { loading });
+const HtmlToPdfTool = dynamic(() => import("./pdf/html-tool").then((m) => m.HtmlToPdfTool), { loading });
+const ImagesToPdfTool = dynamic(() => import("./pdf/images-tool").then((m) => m.ImagesToPdfTool), { loading });
+const RedactTool = dynamic(() => import("./pdf/redact-tool").then((m) => m.RedactTool), { loading });
+const OcrTool = dynamic(() => import("./pdf/simple-tools").then((m) => m.OcrTool), { loading });
+const PageNumbersTool = dynamic(() => import("./pdf/simple-tools").then((m) => m.PageNumbersTool), { loading });
+const PdfaTool = dynamic(() => import("./pdf/simple-tools").then((m) => m.PdfaTool), { loading });
+const ProtectTool = dynamic(() => import("./pdf/simple-tools").then((m) => m.ProtectTool), { loading });
+const RepairTool = dynamic(() => import("./pdf/simple-tools").then((m) => m.RepairTool), { loading });
+const UnlockTool = dynamic(() => import("./pdf/simple-tools").then((m) => m.UnlockTool), { loading });
+const WatermarkTool = dynamic(() => import("./pdf/simple-tools").then((m) => m.WatermarkTool), { loading });
+const QrPlayground = dynamic(() => import("./qr-playground").then((m) => m.QrPlayground), { loading });
+const BlurFaceTool = dynamic(() => import("./image/blur-tool").then((m) => m.BlurFaceTool), { loading });
+const CropImageTool = dynamic(() => import("./image/crop-tool").then((m) => m.CropImageTool), { loading });
+const HtmlToImageTool = dynamic(() => import("./image/html-tool").then((m) => m.HtmlToImageTool), { loading });
+const MemeGeneratorTool = dynamic(() => import("./image/meme-tool").then((m) => m.MemeGeneratorTool), { loading });
+const PhotoEditorTool = dynamic(() => import("./image/photo-editor").then((m) => m.PhotoEditorTool), { loading });
+const ProPhotoEditor = dynamic(() => import("./image/pro/editor").then((m) => m.ProPhotoEditor), { loading, ssr: false });
+const CompressImageTool = dynamic(() => import("./image/simple-tools").then((m) => m.CompressImageTool), { loading });
+const ConvertImageTool = dynamic(() => import("./image/simple-tools").then((m) => m.ConvertImageTool), { loading });
+const RemoveBackgroundTool = dynamic(() => import("./image/simple-tools").then((m) => m.RemoveBackgroundTool), { loading });
+const ResizeImageTool = dynamic(() => import("./image/simple-tools").then((m) => m.ResizeImageTool), { loading });
+const RotateImageTool = dynamic(() => import("./image/simple-tools").then((m) => m.RotateImageTool), { loading });
+const UpscaleImageTool = dynamic(() => import("./image/simple-tools").then((m) => m.UpscaleImageTool), { loading });
+const ImageStudio = dynamic(() => import("./image/studio").then((m) => m.ImageStudio), { loading });
+const WatermarkImageTool = dynamic(() => import("./image/watermark-tool").then((m) => m.WatermarkImageTool), { loading });
+const TranscribePlayground = dynamic(() => import("./transcribe/transcribe-playground").then((m) => m.TranscribePlayground), { loading });
+const UniversalConverter = dynamic(() => import("./universal/universal-converter").then((m) => m.UniversalConverter), { loading });
+const CompressFilesTool = dynamic(() => import("./files/compress-tool").then((m) => m.CompressFilesTool), { loading });
+const MergeFilesTool = dynamic(() => import("./files/merge-tool").then((m) => m.MergeFilesTool), { loading });
+const SplitFilesTool = dynamic(() => import("./files/split-tool").then((m) => m.SplitFilesTool), { loading });
+const IconMakerTool = dynamic(() => import("./image/icon-tool").then((m) => m.IconMakerTool), { loading });
+const DevUtilities = dynamic(() => import("./dev/dev-utilities").then((m) => m.DevUtilities), { loading });
+const ScanTool = dynamic(() => import("./pdf/scan/scan-tool").then((m) => m.ScanTool), { loading });
+const FontChecker = dynamic(() => import("./design/font-checker").then((m) => m.FontChecker), { loading });
+const ColorPicker = dynamic(() => import("./design/color-picker").then((m) => m.ColorPicker), { loading });
+const FontCreator = dynamic(() => import("./design/font-creator").then((m) => m.FontCreator), { loading });
+const ChartMaker = dynamic(() => import("./design/chart-maker").then((m) => m.ChartMaker), { loading });
+const PeriodTracker = dynamic(() => import("./health/period-tracker").then((m) => m.PeriodTracker), { loading });
+const WhatsappAnalyzer = dynamic(() => import("./text/whatsapp-analyzer").then((m) => m.WhatsappAnalyzer), { loading });
+const TranslatorPlayground = dynamic(() => import("./text/translator-playground").then((m) => m.TranslatorPlayground), { loading });
+const InterpreterTool = dynamic(() => import("./text/interpreter").then((m) => m.InterpreterTool), { loading });
+const SheetEditorTool = dynamic(() => import("@/features/office/sheets").then((m) => m.SheetEditorTool), { loading });
+const WordEditorTool = dynamic(() => import("@/features/office/word").then((m) => m.WordEditorTool), { loading });
+const SlidesEditorTool = dynamic(() => import("@/features/office/slides").then((m) => m.SlidesEditorTool), { loading });
+const FlowchartMaker = dynamic(() => import("./design/flowchart-maker").then((m) => m.FlowchartMaker), { loading });
+const SoonWorkspace = dynamic(() => import("./soon-workspace").then((m) => m.SoonWorkspace), { loading });
+const UtilityTool = dynamic(() => import("./utilities/utility-tool").then((m) => m.UtilityTool), { loading });
+const VideoFramesTool = dynamic(() => import("./media/video-frames-tool").then((m) => m.VideoFramesTool), { loading });
+const VideoGifTool = dynamic(() => import("./media/video-gif-tool").then((m) => m.VideoGifTool), { loading });
+const GifSpeedTool = dynamic(() => import("./image/gif-speed-tool").then((m) => m.GifSpeedTool), { loading });
+const PixelateTool = dynamic(() => import("./image/pixelate-tool").then((m) => m.PixelateTool), { loading });
+const EmojiTool = dynamic(() => import("./image/emoji-tool").then((m) => m.EmojiTool), { loading });
+const TrimMediaTool = dynamic(() => import("./media/media-edit-tools").then((m) => m.TrimMediaTool), { loading });
+const SoundTool = dynamic(() => import("./media/media-edit-tools").then((m) => m.SoundTool), { loading });
+const DenoiseTool = dynamic(() => import("./media/media-edit-tools").then((m) => m.DenoiseTool), { loading });
+const RecorderTool = dynamic(() => import("./media/recorder-tool").then((m) => m.RecorderTool), { loading });
+const SubtitleTool = dynamic(() => import("./media/subtitle-tool").then((m) => m.SubtitleTool), { loading });
+const NotepadTool = dynamic(() => import("./text/notepad").then((m) => m.NotepadTool), { loading });
+const WritingHelperTool = dynamic(() => import("./text/writing-helper").then((m) => m.WritingHelperTool), { loading });
+const UsernameGeneratorTool = dynamic(() => import("./text/username-generator").then((m) => m.UsernameGeneratorTool), { loading });
+const ImageToSvgTool = dynamic(() => import("./image/vectorize-tool").then((m) => m.ImageToSvgTool), { loading });
+const MockupSafeZoneTool = dynamic(() => import("./image/mockup-tool").then((m) => m.MockupSafeZoneTool), { loading });
+const SongFinder = dynamic(() => import("./media/song-finder").then((m) => m.SongFinder), { loading });
+const AudioWaveformTool = dynamic(() => import("./media/waveform-tool").then((m) => m.AudioWaveformTool), { loading });
+const ArchiveTool = dynamic(() => import("./files/archive-tool").then((m) => m.ArchiveTool), { loading });
+const DocumentViewerTool = dynamic(() => import("./files/document-viewer").then((m) => m.DocumentViewerTool), { loading });
+const ThreeViewerTool = dynamic(() => import("./design/three-viewer").then((m) => m.ThreeViewerTool), { loading });
+// The video editor (src/features/video-studio): client-only, its WebGL/WebCodecs/AI code in its own chunks.
+const VideoEditor = dynamic(() => import("@/features/video-studio").then((m) => m.VideoEditorEntry), { loading, ssr: false });
+// The API client (src/features/api-studio): client-only, its script sandbox runs in a worker.
+const ApiStudio = dynamic(() => import("@/features/api-studio").then((m) => m.ApiStudioEntry), { loading, ssr: false });
+// The music studio (src/features/music-studio): client-only DAW, audio engine and on-device AI in their own chunks.
+const MusicStudio = dynamic(() => import("@/features/music-studio").then((m) => m.MusicStudioEntry), { loading, ssr: false });
+
+type Workspace = ComponentType<{ toolId: string }>;
+
+/**
+ * Where a live tool's workspace comes from.
+ *
+ * Adding an integration:
+ * 1. Add the tool to `lib/tools.ts` with its `kind`, `takes`/`gives` and (optionally) `steps`.
+ * 2. If its kind already has a workspace here, flip it to `live` and you're done.
+ *    Otherwise build one inside `<Workbench>` and register it below, by kind or by id.
+ *
+ * Built-in workspaces and the config they read:
+ * - link → DownloaderPlayground (`downloader`)
+ * - any tool with a `preset` (PDF to Word, Word to PDF, Video to MP3…) → UniversalConverter with the pair fixed
+ * - pdf (by id) → PdfPlayground (merge, split, organize and compress behind one mode switch)
+ * - the PDF family (by id) → single-purpose workspaces in components/tools/pdf/: most run in
+ *   PdfTask (one input, options, one action, a result to check); merge/split/organize/compress,
+ *   rotate, remove and extract reuse PdfPlayground on a fixed mode
+ * - qr (by id) → QrPlayground (nine kinds of content, live preview, styling and a centre logo)
+ * - audio-to-text (by id) → TranscribePlayground (upload or record, live transcript, read-along, export)
+ * - convert-anything (by id) → UniversalConverter (any file in, a format picked from every route the server can run)
+ * - compress-files, merge-files, split-files (by id) → components/tools/files/ (any kind of file, one engine per format)
+ * - the image family (by id) → components/tools/image/: most run in ImageTask (images in, options,
+ *   one action, a result to compare); crop and blur draw on the image; meme and photo editor run
+ *   in the browser; image (the home-page hub) → ImageStudio, four of them behind a mode switch
+ *
+ * - video-editor (by id) → src/features/video-studio: the multi-track editor (WebGL compositor,
+ *   WebCodecs export, on-device AI); its page alone is cross-origin isolated (next.config.ts)
+ * - music-studio (by id) → src/features/music-studio: the DAW (Web Audio engine, synths, DSP,
+ *   AI songs via /api/tools/music, MusicGen on the device); also cross-origin isolated
+ * - api-client (by id) → src/features/api-studio: the Postman-style API client (collections, scripts in a
+ *   worker sandbox, runner, mocks, monitors, flows; requests via /api/tools/apiclient or the browser)
+ * - the Developer, Text and Everyday utilities (lib/utilities/catalog.ts) → UtilityTool: one engine
+ *   per job (format, hash, random, network…) with the page's preset as its starting state
+ *
+ * Anything not registered shows its kind's preview in SoonWorkspace.
+ */
+const byKind: Partial<Record<ToolKind, Workspace>> = {
+  link: DownloaderPlayground,
+};
+const byId: Record<string, Workspace> = {
+  pdf: PdfPlayground,
+  qr: QrPlayground,
+  "audio-to-text": TranscribePlayground,
+  "convert-anything": UniversalConverter,
+  dev: DevUtilities,
+  "font-checker": FontChecker,
+  "color-picker": ColorPicker,
+  "font-creator": FontCreator,
+  "chart-maker": ChartMaker,
+  "flowchart-maker": FlowchartMaker,
+  "period-tracker": PeriodTracker,
+  "whatsapp-chat-analyzer": WhatsappAnalyzer,
+  translator: TranslatorPlayground,
+  interpreter: InterpreterTool,
+  "excel-editor": SheetEditorTool,
+  "word-editor": WordEditorTool,
+  "powerpoint-editor": SlidesEditorTool,
+  "compress-files": CompressFilesTool,
+  "merge-files": MergeFilesTool,
+  "split-files": SplitFilesTool,
+  // PDF family: organize
+  "merge-pdf": (p) => <PdfPlayground {...p} mode="merge" />,
+  "split-pdf": SplitPdf,
+  "organize-pdf": (p) => <PdfPlayground {...p} mode="organize" />,
+  "scan-to-pdf": ScanTool,
+  // optimize
+  "compress-pdf": (p) => <PdfPlayground {...p} mode="compress" />,
+  "repair-pdf": RepairTool,
+  "ocr-pdf": OcrTool,
+  "pdf-to-pdfa": PdfaTool,
+  // convert to PDF
+  "jpg-to-pdf": ImagesToPdfTool,
+  "html-to-pdf": HtmlToPdfTool,
+  // edit
+  "page-numbers": PageNumbersTool,
+  "watermark-pdf": WatermarkTool,
+  "crop-pdf": CropTool,
+  "edit-pdf": EditTool,
+  // security
+  "unlock-pdf": UnlockTool,
+  "protect-pdf": ProtectTool,
+  "sign-pdf": (p) => <EditTool {...p} sign />,
+  "redact-pdf": RedactTool,
+  "compare-pdf": CompareTool,
+  // Image family
+  image: () => <ImageStudio />,
+  "compress-image": CompressImageTool,
+  "upscale-image": UpscaleImageTool,
+  "remove-background": RemoveBackgroundTool,
+  "meme-generator": MemeGeneratorTool,
+  "photo-editor": PhotoEditorTool,
+  "pro-photo-editor": ProPhotoEditor,
+  "resize-image": ResizeImageTool,
+  "crop-image": CropImageTool,
+  "rotate-image": RotateImageTool,
+  "convert-image": ConvertImageTool,
+  "html-to-image": HtmlToImageTool,
+  "icon-maker": IconMakerTool,
+  "watermark-image": WatermarkImageTool,
+  "blur-face": BlurFaceTool,
+  "pixelate-image": PixelateTool,
+  "gif-speed": GifSpeedTool,
+  "emoji-to-image": EmojiTool,
+  // Audio & video, made in the browser
+  "video-editor": VideoEditor,
+  "music-studio": MusicStudio,
+  // Developer: the API client
+  "api-client": ApiStudio,
+  "video-to-frames": VideoFramesTool,
+  "video-to-gif": VideoGifTool,
+  // Audio & video, edited on our server (trim, volume) or in the browser (recorder, subtitles)
+  "trim-media": TrimOrCut,
+  "audio-volume": SoundTool,
+  "noise-remover": DenoiseTool,
+  "screen-recorder": RecorderTool,
+  "subtitle-editor": SubtitleTool,
+  // Song finder: hum, sing or type → the song (notes found on the device, words via the server)
+  "song-finder": SongFinder,
+  writing: WritingHelperTool,
+  notepad: NotepadTool,
+  "username-generator": UsernameGeneratorTool,
+  "image-to-svg": ImageToSvgTool,
+  "mockup-frame-generator": MockupSafeZoneTool,
+  "audio-waveform-generator": AudioWaveformTool,
+  "archive-extractor-creator": ArchiveTool,
+  "document-viewer": DocumentViewerTool,
+  "3d-viewer": ThreeViewerTool,
+};
+
+/*
+ * Workspaces whose starting mode can come from the address (lib/start-params.ts), so the pages
+ * merged into them (Extract pages, Multi-cutter) still open on the mode they used to show. The
+ * value is null on the server, so the key remounts the workspace, still empty, once it's known.
+ */
+function SplitPdf(p: { toolId: string }) {
+  const pages = useStartParam("pages");
+  return <PdfPlayground key={pages ?? "-"} {...p} mode="split" chosenPages={pages === "chosen"} />;
+}
+function TrimOrCut({ toolId }: { toolId: string }) {
+  const mode = useStartParam("mode");
+  return <TrimMediaTool key={mode ?? "-"} toolId={toolId} initialMode={mode === "parts" ? "parts" : "trim"} />;
+}
+
+/** A standalone page for one tab of the developer hub (JSON formatter, JWT decoder…). */
+function DevTabPage({ toolId }: { toolId: string }) {
+  return <DevUtilities toolId={toolId} start={getTool(toolId)?.devTab} />;
+}
+
+export function Playground({ toolId }: { toolId: string }) {
+  const tool = getTool(toolId)!;
+  const Live =
+    tool.status === "live"
+      ? (byId[tool.id] ?? (tool.devTab ? DevTabPage : getUtility(tool.id) ? UtilityTool : tool.preset ? UniversalConverter : byKind[tool.kind]))
+      : undefined;
+  return Live ? <Live toolId={toolId} /> : <SoonWorkspace toolId={toolId} />;
+}

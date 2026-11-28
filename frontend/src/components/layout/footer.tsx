@@ -1,0 +1,99 @@
+import Link from "next/link";
+import { HapticsToggle } from "@/components/layout/haptics-toggle";
+import { Logo } from "@/components/ui/logo";
+import { Container } from "@/components/ui/primitives";
+import { LEGAL_PAGES } from "@/lib/legal";
+import { CONTACT_EMAIL } from "@/lib/site";
+import { CLUSTERS, clusterHref, tools } from "@/lib/tools";
+
+const columns = [
+  {
+    title: "Tools",
+    links: [
+      ...CLUSTERS.map((c) => ({ label: c.title, href: clusterHref(c.id) })),
+      { label: `All ${tools.length} tools`, href: "/tools" },
+    ],
+  },
+  {
+    title: "Product",
+    links: [
+      { label: "How it works", href: "/#how" },
+      { label: "Why us", href: "/#why" },
+      { label: "FAQ", href: "/#faq" },
+      { label: "Blog", href: "/blog" },
+      { label: "Request a tool", href: "/#request" },
+    ],
+  },
+  {
+    title: "Help",
+    links: LEGAL_PAGES.filter((p) => p.group === "help").map((p) => ({ label: p.label, href: p.href })),
+  },
+  {
+    title: "Legal",
+    links: LEGAL_PAGES.filter((p) => p.group === "legal").map((p) => ({ label: p.label === "Terms" ? "Terms & conditions" : p.label, href: p.href })),
+  },
+];
+
+export function Footer() {
+  return (
+    <footer className="mt-auto border-t border-line">
+      <Container className="pt-16">
+        <div className="grid gap-12 md:grid-cols-12">
+          <div className="md:col-span-5">
+            <Logo />
+            <p className="mt-4 max-w-xs text-[15px] leading-relaxed text-ink-2">
+              One place to do whatever you need. Paste, pick, done.
+            </p>
+            <a href={`mailto:${CONTACT_EMAIL}`} className="mt-3 inline-block py-1 text-[15px] text-ink-2 underline decoration-line underline-offset-4 transition-colors hover:text-ink hover:decoration-ink">
+              {CONTACT_EMAIL}
+            </a>
+            <a
+              href="https://www.saashub.com/do-whatever-you-like?utm_source=badge&utm_campaign=badge&utm_content=do-whatever-you-like&badge_variant=color&badge_kind=approved"
+              target="_blank"
+              rel="noopener"
+              className="mt-6 inline-block transition-opacity hover:opacity-85"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="https://cdn-b.saashub.com/img/badges/approved-color.png?v=1"
+                alt="Do-Whatever-You-Like badge"
+                width={150}
+                height={50}
+                loading="lazy"
+              />
+            </a>
+          </div>
+          <nav aria-label="Footer" className="grid grid-cols-2 gap-8 sm:grid-cols-4 md:col-span-7">
+            {columns.map((col) => (
+              <div key={col.title}>
+                <p className="label-mono text-ink-3">{col.title}</p>
+                <ul className="mt-3 space-y-0.5">
+                  {col.links.map((l) => (
+                    <li key={l.label}>
+                      <Link href={l.href} className="inline-block py-1.5 text-[15px] text-ink-2 transition-colors hover:text-ink">
+                        {l.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </nav>
+        </div>
+
+        <div className="mt-16 flex flex-col gap-2 border-t border-line py-6 text-sm text-ink-3 sm:flex-row sm:items-center sm:justify-between">
+          <p>© 2026 Do-Whatever-You-Like. All rights reserved.</p>
+          <p>Only download content you have the right to use.</p>
+          <HapticsToggle />
+        </div>
+
+        <p
+          aria-hidden
+          className="pointer-events-none -mb-[0.2em] select-none overflow-hidden whitespace-nowrap text-center text-[clamp(2rem,8.4vw,7rem)] font-semibold leading-none tracking-[-0.06em] text-paper-2"
+        >
+          Do-Whatever-You-Like
+        </p>
+      </Container>
+    </footer>
+  );
+}

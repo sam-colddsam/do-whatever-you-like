@@ -1,0 +1,143 @@
+"use client";
+
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { ArrowRight } from "lucide-react";
+import { SignalDot } from "@/components/ui/primitives";
+import { getTool, toolHref } from "@/lib/tools";
+
+const EASE = [0.22, 1, 0.36, 1] as const;
+const ROTATE_MS = 4200;
+
+/**
+ * Short, true headlines. Each one links to the tool it's about. Entries whose tool is no longer in
+ * the registry are dropped (see `news` below), so a removed tool never shows up here.
+ */
+const headlines = [
+  { tag: "New", text: "Hum or sing it: find any song, its lyrics & video", tool: "song-finder" },
+  { tag: "New", text: "Word, Excel & PowerPoint editors in your browser", tool: "word-editor" },
+  { tag: "New", text: "Make songs with AI in the music studio", tool: "music-studio" },
+  { tag: "New", text: "A full video editor, right in your browser", tool: "video-editor" },
+  { tag: "New", text: "A free API client: collections, scripts, runner", tool: "api-client" },
+  { tag: "New", text: "Pro photo editor with layers and PSD", tool: "pro-photo-editor" },
+  { tag: "New", text: "Translate text, audio & video free", tool: "translator" },
+  { tag: "New", text: "Live voice interpreter for conversations", tool: "interpreter" },
+  { tag: "New", text: "WhatsApp chat analyzer, in any language", tool: "whatsapp-chat-analyzer" },
+  { tag: "New", text: "Private period tracker, 100% on your device", tool: "period-tracker" },
+  { tag: "New", text: "Compress any file: PDF, Office, video…", tool: "compress-files" },
+  { tag: "New", text: "Convert any file to any format", tool: "convert-anything" },
+  { tag: "Live", text: "Speech to text in 99 languages", tool: "audio-to-text" },
+  { tag: "Live", text: "PDF to Word, Excel and PowerPoint", tool: "pdf-to-word" },
+  { tag: "Live", text: "QR codes with your logo on them", tool: "qr" },
+  { tag: "Live", text: "Turn any video into an MP3", tool: "audio" },
+  { tag: "Live", text: "YouTube Shorts, best quality", tool: "youtube" },
+] as const;
+
+const news = headlines.flatMap((h) => {
+  const tool = getTool(h.tool);
+  return tool && tool.status === "live" ? [{ ...h, beta: Boolean(tool.beta) }] : [];
+});
+
+/**
+ * The hero's announcement chip: a rounded bubble with an ink "tag" bubble inside it.
+ * Messages roll upward every few seconds and the chip's width springs to fit each one.
+ * Hovering or focusing it pauses the rotation; reduced motion shows the first message only.
+ */
+export function Announcement() {
+  if (news.length === 0) return null;
+  return <AnnouncementChip />;
+}
+
+function AnnouncementChip() {
+  const reduce = useReducedMotion();
+  const [i, setI] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const [width, setWidth] = useState<number | "auto">("auto");
+  const measure = useRef<HTMLSpanElement>(null);
+  const item = news[i];
+
+  useEffect(() => {
+    if (reduce || paused) return;
+    const t = setInterval(() => {
+      if (!document.hidden) setI((n) => (n + 1) % news.length);
+    }, ROTATE_MS);
+    return () => clearInterval(t);
+  }, [reduce, paused]);
+
+  // Measure the incoming message so the bubble can spring to its width. A ResizeObserver
+  // (not a one-off read) so a late web-font swap re-measures too.
+  useLayoutEffect(() => {
+    const el = measure.current;
+    if (!el) return;
+    const syncWidth = () => setWidth(Math.ceil(el.getBoundingClientRect().width) + 2);
+    syncWidth();
+    const ro = new ResizeObserver(syncWidth);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [i]);
+
+  return (
+    <Link
+      href={toolHref(item.tool)}
+      aria-label={`${item.tag}: ${item.text}${item.beta ? " (Beta)" : ""}`}
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocus={() => setPaused(true)}
+      onBlur={() => setPaused(false)}
+      className="group inline-flex h-9 max-w-full items-center gap-2.5 rounded-full border border-line bg-surface/90 py-1 pl-1 pr-3 text-sm text-ink shadow-card backdrop-blur transition-[border-color,transform,box-shadow] duration-200 ease-out-soft hover:-translate-y-px hover:border-ink-3 active:translate-y-0"
+    >
+      <span className="label-mono inline-flex h-7 shrink-0 items-center gap-1.5 rounded-full bg-ink pl-2.5 pr-3 text-paper">
+        <SignalDot pulse />
+        <AnimatePresence mode="popLayout" initial={false}>
+          <motion.span
+            key={item.tag}
+            initial={{ opacity: 0, y: 6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ duration: 0.3, ease: EASE }}
+          >
+            {item.tag}
+          </motion.span>
+        </AnimatePresence>
+      </span>
+
+      <motion.span
+        animate={{ width }}
+        transition={{ type: "spring", bounce: 0.25, duration: 0.6 }}
+        className="relative block h-5 min-w-0 max-w-[calc(100vw-9.5rem)] overflow-hidden sm:max-w-none"
+      >
+        {/* Invisible in-flow copy: sizes the slot before hydration and is measured after. */}
+        <span ref={measure} aria-hidden className="invisible inline-block w-max whitespace-nowrap leading-5">
+          {item.text}
+        </span>
+        <AnimatePresence mode="popLayout" initial={false}>
+          <motion.span
+            key={i}
+            initial={{ y: "110%", opacity: 0 }}
+            animate={{ y: "0%", opacity: 1 }}
+            exit={{ y: "-110%", opacity: 0 }}
+            transition={{ duration: 0.5, ease: EASE }}
+            className="absolute left-0 top-0 block truncate whitespace-nowrap leading-5"
+            style={{ maxWidth: "100%" }}
+          >
+            {item.text}
+          </motion.span>
+        </AnimatePresence>
+      </motion.span>
+
+      {item.beta && (
+        <span
+          title="Runs on our free server: may be slower or briefly busy"
+          className="label-mono hidden shrink-0 rounded-sm border border-warning/35 bg-warning/10 px-1.5 py-px text-[10px] text-warning sm:inline"
+        >
+          Beta
+        </span>
+      )}
+      <ArrowRight
+        aria-hidden
+        className="size-3.5 shrink-0 text-ink-3 transition-[transform,color] duration-200 ease-out-soft group-hover:translate-x-0.5 group-hover:text-ink"
+      />
+    </Link>
+  );
+}

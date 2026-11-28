@@ -1,0 +1,35 @@
+# Backend
+**/cookies*.txt
+**/venv/
+**/__pycache__/
+*.py[cod]
+**/.env
+**/temp/
+**/downloads/
+*.zip
+**/test.py
+**/postman_collection.json
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.next/
+frontend/build/
+frontend/.env*
+.claude/
+.mcp*
+
+.dev-pids
+.agents/
+# Speech models (downloaded on first use)
+**/models/
+
+# Website listing & asset sheets
+website-assets-and-details.xlsx
+dwyl.png
+
+# Launch videos, audio and marketing assets (large files)
+launch-kit/
+GEO-ANALYSIS.md
+
+skills-lock.json

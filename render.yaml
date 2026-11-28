@@ -1,0 +1,117 @@
+# Render Blueprint for the backend (Dashboard -> New -> Blueprint -> pick this repo).
+# The frontend deploys separately on Vercel (root directory: frontend).
+services:
+  - type: web
+    name: do-whatever-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    autoDeploy: true
+    envVars:
+      # Same value as BACKEND_TOKEN on Vercel. Render can generate one; copy it across.
+      - key: HEADER_TOKEN
+        generateValue: true
+      # Your Vercel address as a JSON list, e.g. ["https://do-whatever-you-like.colddsam.com"].
+      # Browsers send files straight here, so only your site may call it.
+      - key: ALLOWED_ORIGINS
+        sync: false
+      # The free instance has 0.1 CPU: cap the slowest jobs so they finish in minutes, not hours.
+      - key: PDF_OCR_MAX_PAGES
+        value: "30"
+      - key: PDF_COMPARE_MAX_PAGES
+        value: "100"
+      - key: CONVERT_EXCEL_MAX_PAGES
+        value: "100"
+      # Speech to text. With a free Groq key (https://console.groq.com) recordings are transcribed by
+      # Whisper large-v3 in seconds; without one, Whisper "base" runs on the 0.1 CPU here, which is slow.
+      # With a key, audio is sent to Groq, and the page says so.
+      - key: TRANSCRIBE_GROQ_API_KEY
+        sync: false
+      - key: TRANSCRIBE_MAX_DURATION_SECONDS
+        value: "7200"
+      # Translator (text, audio & video): works free out of the box. Optional caps & email for 50k/day MyMemory.
+      - key: TRANSLATE_VIDEO_MAX_SECONDS
+        value: "600"
+      - key: TRANSLATE_AUDIO_MAX_SECONDS
+        value: "1800"
+      - key: TRANSLATE_MYMEMORY_EMAIL
+        sync: false
+      - key: TRANSLATE_GROQ_API_KEY
+        sync: false
+      # Image tools. Images are decoded in memory (4 bytes a pixel), so they're capped for 512 MB.
+      # Upscaling's time follows the pixels Real-ESRGAN sees (~6 min per megapixel on 0.1 CPU, for 2x
+      # and 4x alike): bigger pictures are reduced to 0.5 MP for the network (~3 min at most) and the
+      # result resized to the size asked for, so 2x and 4x are both always offered. Results up to 12 MP.
+      - key: IMAGE_MAX_PIXELS
+        value: "25000000"
+      - key: IMAGE_UPSCALE_MAX_INPUT_PIXELS
+        value: "500000"
+      - key: IMAGE_UPSCALE_MAX_OUTPUT_PIXELS
+        value: "12000000"
+      # Universal converter (any file -> any format). Re-encoding video on 0.1 CPU runs at about real
+      # time or slower, so it's capped; copying streams (MP4 -> MKV, M4A -> AAC) isn't.
+      - key: UNIVERSAL_VIDEO_MAX_SECONDS
+        value: "600"
+      - key: UNIVERSAL_TIMEOUT_SECONDS
+        value: "900"
+      # Compressing video, and merging videos that need re-encoding, have the same cap.
+      - key: COMPRESS_VIDEO_MAX_SECONDS
+        value: "600"
+      - key: MERGE_SPLIT_VIDEO_MAX_SECONDS
+        value: "600"
+      # YouTube: long videos are fine; the page offers only the qualities that fit this size cap.
+      - key: YOUTUBE_MAX_DOWNLOAD_MB
+        value: "500"
+      - key: YOUTUBE_MAX_DURATION_SECONDS
+        value: "14400"
+      # Instagram only shares posts with a signed-in session. Export cookies.txt from a browser signed in
+      # to a spare Instagram account (README, "Cookie Configuration") and add it in the Render dashboard
+      # under Environment -> Secret Files, named cookies_instagram.txt; Render mounts it here. Without it,
+      # the Instagram page explains that downloads aren't set up. The session lasts weeks to months.
+      - key: INSTAGRAM_COOKIE_FILE_PATH
+        value: /etc/secrets/cookies_instagram.txt
+      - key: FACEBOOK_COOKIE_FILE_PATH
+        value: /etc/secrets/cookies_facebook.txt
+      # Tool request inbox & free HTTPS email providers (Render Free blocks SMTP 465/587, so HTTPS APIs
+      # like Resend, Brevo, Web3Forms, or Google Apps Script work here cleanly on port 443).
+      - key: TOOL_REQUEST_TO_EMAIL
+        value: "contact@colddsam.com"
+      - key: TOOL_REQUEST_RESEND_API_KEY
+        sync: false
+      - key: TOOL_REQUEST_BREVO_API_KEY
+        sync: false
+      - key: TOOL_REQUEST_WEB3FORMS_ACCESS_KEY
+        sync: false
+      - key: TOOL_REQUEST_APPS_SCRIPT_URL
+        sync: false
+      # Video editor (/tools/video-editor). The editor runs entirely in the browser (WebGL, WebCodecs,
+      # on-device AI); this service only proxies Google Fonts and free stock media from allowlisted
+      # hosts, and plans AI Director edits. It loads no models and writes no files, so it adds almost
+      # nothing to the 512 MB budget. Without either key the editor's built-in commands are used; an
+      # existing TRANSLATE_/TRANSCRIBE_GROQ_API_KEY is reused automatically.
+      # Free Gemini key: https://aistudio.google.com/apikey
+      - key: STUDIO_GEMINI_API_KEY
+        sync: false
+      - key: STUDIO_GROQ_API_KEY
+        sync: false
+      - key: STUDIO_PROXY_MAX_MB
+        value: "200"
+      # Music studio (/tools/music-studio). Everything audible is made in the browser; this service
+      # only asks a free LLM for song plans and lyrics (tiny JSON, no models, no files). It reuses any
+      # Groq key set above (STUDIO_/TRANSLATE_/TRANSCRIBE_GROQ_API_KEY) and Gemini as a fallback;
+      # without a key the studio's built-in composer is used. Vocals use the studio's free Edge voices.
+      - key: MUSIC_GROQ_API_KEY
+        sync: false
+      # Song finder (/tools/song-finder). Free APIs do the work: Groq's Whisper hears the words, a
+      # free LLM names candidate songs, iTunes Search and LRCLIB (no keys) prove them, and yt-dlp finds
+      # the video. No models, no stored files: a short clip is deleted as soon as it's answered.
+      # Any Groq/Gemini key set above is reused automatically; these only override them.
+      - key: SONGID_GROQ_API_KEY
+        sync: false
+      - key: SONGID_GEMINI_API_KEY
+        sync: false
+      # Optional: if YouTube starts answering "Sign in to confirm you're not a bot" (it does that to
+      # some cloud IP ranges), add a cookies.txt from a signed-in browser as cookies_youtube.txt.
+      - key: YOUTUBE_COOKIE_FILE_PATH
+        value: /etc/secrets/cookies_youtube.txt
